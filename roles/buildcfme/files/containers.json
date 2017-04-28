@@ -1,0 +1,10 @@
+[
+  {
+  "Description": "cfme5713-1",
+  "Format": "vhd",
+  "UserBucket": {
+        "S3Bucket": "cfmeeast",
+	"S3Key": "cfme-ec2-5.7.1.3-1.x86_64.vhd"
+      }
+  }
+]

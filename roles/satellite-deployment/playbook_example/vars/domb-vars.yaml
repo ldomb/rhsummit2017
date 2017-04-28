@@ -1,0 +1,59 @@
+---
+# MY SATELLITE ENVIRONMENT VARIABLES
+# main vars
+satellite_deployment_hostname_short: "sat6"
+satellite_deployment_hostname_full: "sat6.local.domb.com"
+satellite_deployment_admin_username: "admin"
+satellite_deployment_admin_password: "gate21"
+satellite_deployment_organization: "redhat"
+satellite_deployment_location: "nyc"
+
+# network
+satellite_deployment_ip_address: "192.168.1.14"
+satellite_deployment_network_address: "192.168.1.0"
+satellite_deployment_net_prefix: "24"
+satellite_deployment_gw_address: "192.168.1.0"
+satellite_deployment_net_interface: "enp5s0"
+satellite_deployment_dhcp_interface: "{{ satellite_deployment_net_interface }}"
+satellite_deployment_dns_interface: "{{ satellite_deployment_net_interface }}"
+satellite_deployment_dns_forwarder: "192.168.1.13"
+satellite_deployment_dns_zone: "local.domb.com"
+satellite_deployment_dns_reverse_zone: "1.168.192.in-addr.arpa"
+satellite_deployment_dhcp_start: "192.168.1.50"
+satellite_deployment_dhcp_end: "192.168.1.100"
+
+#satellite_deployment_plugin_ports
+
+
+# install
+satellite_deployment_plugin_packages:
+  - "foreman-discovery-image"
+
+# registration vars
+satellite_deployment_rhn_user: "ldomb@redhat.com"
+satellite_deployment_rhn_password: "Sm151bm1"
+
+# answers for sattelite installer
+satellite_deployment_answers:
+  "foreman-initial-organization": "{{ satellite_deployment_organization }}"
+  "foreman-initial-location": "{{ satellite_deployment_location }}"
+  "foreman-admin-username": "{{ satellite_deployment_admin_username }}"
+  "foreman-admin-password": "{{ satellite_deployment_admin_password }}"
+  "foreman-proxy-dns": "true"
+  "foreman-proxy-dns-interface": "{{ satellite_deployment_dns_interface }}"
+  "foreman-proxy-dns-zone": "{{ satellite_deployment_dns_zone }}"
+  "foreman-proxy-dns-forwarders": "{{ satellite_deployment_dns_forwarder }}"
+  "foreman-proxy-dns-reverse": "{{ satellite_deployment_dns_reverse_zone }}"
+  "foreman-proxy-dhcp": "true"
+  "foreman-proxy-dhcp-interface": "{{ satellite_deployment_dhcp_interface }}"
+  "foreman-proxy-dhcp-range": "{{ satellite_deployment_dhcp_start }}
+    {{ satellite_deployment_dhcp_end }}"
+  "foreman-proxy-dhcp-gateway": "{{ satellite_deployment_gw_address }}"
+  "foreman-proxy-dhcp-nameservers": "{{ satellite_deployment_ip_address }}"
+  "foreman-proxy-tftp": "true"
+  "foreman-proxy-tftp-servername": "{{ satellite_deployment_hostname_full }}"
+  "foreman-proxy-puppetca": "true"
+  "capsule-puppet": "true"
+
+# configure_satellite:
+satellite_deployment_manifest_path: "http://192.168.1.10/sat-manifest.zip"

@@ -1,0 +1,24 @@
+---
+- name: build ec2 instance
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  user: root
+
+  vars_files:
+    - "group_vars/all/vars"
+    - "group_vars/all/vault"
+  roles:
+    - { role: manage-ec2-instances }
+
+- name: create tower
+  hosts: tag_Type_{{ tower_tag_Name }}
+  become: yes
+  remote_user: ec2-user
+  become_method: sudo
+  gather_facts: true
+  vars_files:
+    - "group_vars/all/vars"
+    - "group_vars/all/vault"
+  roles:
+    - { role: buildansibletower }

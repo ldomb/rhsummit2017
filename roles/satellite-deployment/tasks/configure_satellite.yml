@@ -1,0 +1,204 @@
+---
+#Create Hammer directory on /root
+- name: "Configure | create .hammer directory on user"
+  file:
+    path: "~/.hammer"
+    state: "directory"
+    mode: "0755"
+
+#Copy the hammer configuration from template to the .hammer directory
+- name: "Configure | set configuration for hammer from template"
+  template:
+    src: "hammer_config.yml.j2"
+    dest: "~/.hammer/cli_config.yml"
+
+#Copy the manifest
+- name: "Configure | copy manifest"
+  become: "yes"
+  copy:
+    src: "{{ satellite_deployment_manifest_path }}"
+    dest: "{{ satellite_deployment_manifest_dest_path }}"
+  when: "{{ not satellite_deployment_remote_manifest }}"
+
+- name: "Configure | copy manifest from remote"
+  become: "yes"
+  get_url:
+    url: "{{ satellite_deployment_manifest_path }}"
+    dest: "{{ satellite_deployment_manifest_dest_path }}"
+  when: "{{ satellite_deployment_remote_manifest }}"
+
+#Upload the manifest to the satellite
+- name: "Configure | upload the manifest"
+  become: "yes"
+  shell: "hammer subscription upload --file
+    {{ satellite_deployment_manifest_dest_path }} --organization
+    {{ satellite_deployment_organization }}"
+
+#Enabling repos on satellite
+- name: "Configure | enable repos"
+  become: "yes"
+  shell: "hammer repository-set '{{ item.state }}' --organization
+    '{{ satellite_deployment_organization }}'
+    --product '{{ item.product_name }}' --name '{{ item.name_repo }}'
+    {% if item.rel is defined %} --releasever '{{ item.rel }}' {% endif %}
+    --basearch '{{ item.architecture}}'"
+  with_items: "{{ satellite_deployment_repositories }}"
+  ignore_errors: "yes"
+  tags:
+    - "satellite_deployment_repositories"
+
+#Get the repos ids and sync the repos
+- name: "Configure | grab repositories uuid"
+  shell: "hammer repository list --organization
+    {{ satellite_deployment_organization }} | grep yum | awk '{print $1}'"
+  register: "repos"
+
+- name: sleep as it seems there is race condition in aws
+  pause: 
+    minutes: 1
+
+- name: "Configure | sync repos on satellite"
+  shell: "hammer repository synchronize --id '{{ item }}' --organization
+    {{ satellite_deployment_organization }}"
+  with_items: "{{ repos.stdout_lines }}"
+  register: "sync_repos_result"
+  retries: 3
+  until: "{{ sync_repos_result | success }}"
+
+- name: "create contentviews for cv_rhel7_base demo"
+  shell: "hammer content-view create --organization redhat --name cv_rhel7_base --repository-ids 1,2,3 --description rhelbase"
+
+- name: "create contentviews for cv_cfme57_base demo"
+  shell: "hammer content-view create --organization redhat --name cv_cfme57 --repository-ids 1,2,3,4 --description rhelbase"
+
+- name: get rhel7 repoid
+  shell: "hammer content-view list --organization redhat | grep cv_rhel7_base | awk '{print $1}'"
+  register: "rhel7repoid"
+
+- name: get cfmerepo repoid
+  shell: "hammer content-view list --organization redhat | grep cv_cfme57 | awk '{print $1}'"
+  register: "cfme57repoid"
+
+- name: publish the content view rhel7
+  shell: "hammer content-view publish --id {{ rhel7repoid.stdout }}"
+  register: "publish"
+  retries: 3
+  until: "{{ publish | success }}"
+
+- name: publish the content view cfme
+  shell: "hammer content-view publish --id {{ cfme57repoid.stdout }}"
+  register: "publish"
+  retries: 3
+  until: "{{ publish | success }}"
+
+- name: create AK for rhel
+  shell: "hammer activation-key create --name rhel7 --content-view cv_rhel7_base --lifecycle-environment Library --organization redhat"
+
+- name: create AK for cfme
+  shell: "hammer activation-key create --name cfme --content-view cv_cfme57 --lifecycle-environment Library --organization redhat"
+
+- name: get ak id rhel
+  shell: "hammer activation-key list --organization redhat | grep rhel7 | awk '{print $1}'"
+  register: "akid"
+
+- name: get ak id cfme
+  shell: "hammer activation-key list --organization redhat | grep cfme | awk '{print $1}'"
+  register: "akidcfme"
+
+- name: get subscription id
+  shell: "hammer subscription list --organization redhat | grep Cloud | awk '{print $1}'"
+  register: "subid"
+
+- name: add subs to key
+  shell: "hammer activation-key add-subscription --id {{ akid.stdout }} --subscription-id {{ subid.stdout }}"
+
+- name: add subs to key
+  shell: "hammer activation-key add-subscription --id {{ akidcfme.stdout }} --subscription-id {{ subid.stdout }}"
+
+- name: get cloudforms id
+  set_fact: 
+    cloudformsip: "{{ hostvars[groups['tag_Name_' + cfme_tag_Name ][0]]['ec2_private_ip_address'] }}"
+
+- name: get sat6 cert
+  command: cat /root/ssl-build/katello-server-ca.crt
+  register: sat6cert
+
+- name: sat6cert
+  lineinfile:
+    dest: /etc/pki/ca-trust/source/anchors/sat6.crt
+    line: "{{ sat6cert.stdout }}"
+    create: yes
+  delegate_to: "{{ cloudformsip }}"
+
+- name: update certs
+  shell: update-ca-trust
+  delegate_to: "{{ cloudformsip }}"
+
+- name: add sat6 to /etc/hosts on cfme
+  lineinfile:
+    dest: /etc/hosts
+    line: "{{ hostvars[groups['tag_Name_' + sat6_tag_Name][0]]['ec2_private_ip_address'] }} {{ hostvars[groups['tag_Name_' + sat6_tag_Name][0]]['ec2_private_dns_name'] }} satellite6"
+  delegate_to: "{{ cloudformsip }}"
+
+- name: create sat6 provider
+  uri:
+    url: "https://{{ cloudformsip }}/api/providers?provider_class=provider"
+    method: "POST"
+    user: "admin"
+    password: "{{ cfme_pass }}"
+    validate_certs: no
+    body_format: json
+    body: "{{ lookup('template', 'sat6_provider.json.j2') | to_json }}"
+ 
+- name: get ansible tower pub ip
+  set_fact:
+    towerpubip: "{{ hostvars[groups['tag_Name_' + tower_tag_Name][0]]['ec2_ip_address'] }}"
+
+- name: create sat6 creds
+  command: tower-cli credential create -n satellite6 --kind satellite6 --username admin  --password {{ sat6_pass }} --host https://{{ inventory_hostname }} --organization Default
+  register: sat6creds
+  retries: 10
+  until: sat6creds.rc == 0
+  ignore_errors: yes
+  delay: 5
+  delegate_to: "{{ towerpubip }}"
+
+- name: create satellite6 inventory
+  command: tower-cli inventory create -n satellite6 --organization=Default
+  register: satellite6inv
+  retries: 10
+  until: satellite6inv.rc == 0
+  ignore_errors: yes
+  delay: 5
+  delegate_to: "{{ towerpubip }}"
+
+- name: create satellite6 group
+  command: tower-cli group create -n satellite6 --credential satellite6 -i satellite6 --source satellite6
+  register: satellite6group
+  retries: 10
+  until: satellite6group.rc == 0
+  ignore_errors: yes
+  delay: 5
+  delegate_to: "{{ towerpubip }}"
+
+- name: satellite6 inventory sync
+  command: tower-cli group sync satellite6
+  register: satellite6sync
+  retries: 10
+  until: satellite6sync.rc == 0
+  ignore_errors: yes
+  delay: 5
+  delegate_to: "{{ towerpubip }}"
+
+- name: add provider to satellite6
+  shell: hammer compute-resource create --name='aws' --provider='ec2' --organizations='redhat' --region='us-east-1' --user='{{ ec2_access }}' --password='{{ ec2_secret }}' --url='notneededbutneeded'
+
+- name: "Enable basic auth for insights"
+  template:
+    src: "templates/config.yml.j2"
+    dest: "/etc/redhat_access/config.yml"
+    owner: root
+    group: root
+    mode: 0644
+  notify:
+    - restart apache

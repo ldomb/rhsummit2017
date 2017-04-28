@@ -1,0 +1,55 @@
+---
+#### THIS IS A DEMO VAULT FILE AND IS USUALLY ENCRYPTED #############################
+vault_ec2_keypair: "YOURKEYPAIR"
+vault_ec2_security_group: "YOURSECURITYGROUP"
+vault_ec2_subnet_ids: ['YOURSUBNETID']
+vault_ec2_access: ACCESSKEY
+vault_ec2_secret: AWSSECRET
+vault_tower_pass: RedhatIsCool
+vault_sat6_pass: RedhatIsCool
+vault_cfme_pass: RedhatIsCool
+vault_gitlab_pass: pushthelinimit
+vault_rhn_pass: pushthelinimit
+vault_rhn_user: YOURRHNUSER@COMPANY.COM
+vault_root_password: RedhatIsCool
+vault_vault_password: YOURVAULTPASSWORD
+vault_tower_lic: {"eula_accepted" : "true",
+           "subscription_name": "Ansible Tower by Red Hat, Standard (10 Managed Nodes)",
+           "company_name": "Red Hat, Inc.",
+           "contact_email": "YOUREMAIL",
+           "contact_name": "CONTACT NAME",
+           "hostname": "9e7e3633594b4dc7a545678954335564534668838b50",
+           "instance_count": 10,
+           "license_date": 1515333827,
+           "license_key": "0885a59af420b57f8f9f8f553c2b3a44567cc14a059bf8cc55bba231600be4538ff2767238a57",
+           "license_type": "enterprise",
+    }
+
+vault_ec2_private_key: |
+  -----BEGIN RSA PRIVATE KEY-----
+  MIIEowIBAAKCAQEAl5Mfx+QjwGwWTxxKuQIWtVxzPnb1YYDWE5pbappSB4kSb+rw
+  wm4EU7llRIapGi6PeGFC/0GhIZjIwJRkNR2EPC4nwVRae0BYdJYAVNXYjRGoTLeU
+  aATx18eCxgQlEPrrKRp9E8aFaMLnxCkUf4BKLOtmH2Op03El1IjSv+e/ru0wrlPW
+  BFDNPBTLzn+Y/khgLKvnigwSt0KyA/pPbwsODJSf9LwUCIyqJvm4izPVicaGKsSr
+  JEQgy352r+iUrbdH20Sbqr2yFOxq+TL/pCjamzDTPHyRQub9maMJrgtzjGkUhaht
+  PAH4xTiefTnYIX52NKqgAiddj/Gg6ET/tUpCuwIDAQABAoIBAQCW1aidoXDWbnkw
+  1oWhX+u7JLnmIjkDg1MFhOiNx+3zY7s+NjzKLvMNYgPdUmf7DvRkpd0m6GdxaHn1
+  8nVZyfqqbH/RSqET369mrVK9GWT61OR3G4SKkskbooWHid5c7GWRrLNlN3vRCYvb
+  z8l/K+okk0g32lTIfeNYgaO/pt5AMm7cbStW1OKtuNbGq1yzYxSrm5VOPLIsl8EL
+  pErA0VZZWNrkwaE9S1W7NloIlSXNqY//W1+6VdyyGtfAoa96keqAgFoe6xZUgqM8
+  bzZiEWHI9VXivHBVSywaufFUEWZcIhnTeWmbDbdxZw77vZ3SKeIzizjQL7zymKHN
+  9VtrFf5ZAoGBAMZXriyN64jgTnpu4Tig6j11lu+VuOYsKdnLIhh3AVnqkhAjwbVs
+  pbBJqmEeU6rgvWBorOhb4fmui6WazViD88te3KQRnB1DaiAlsG9AviAaBhS5/qZy
+  Ibkq4yRH2i+uaYAmE+rfgrDPW+VSAJf9AwQ4TjFSDw256tTTOjVzQaO1AoGBAMOj
+  D9oE5p4H6Es2burbMSSXu6a+TtzCY9EBdNvESB6+K/MmJPiy/St+mz/EdiAjHOa2
+  nRXVKXx4WCqEExLiEcDxSsOWDIhXXR7ChvQKT+5CUU64Hmq+cu5vsQXPkdjKCT50
+  8eSlgO6FSvMip/mNvedvSTdixmml2zFYotte6jKvAoGAMX9CHSZRqDfp/c3b8Mjf
+  i/TjdOjVWsOcshhqataQBMNwLgzuU3tIogTQOypZUOSC/iNBOz9q1meDvBE0u6k6
+  Vv9Waq9mWTswqdMeA7WRfOthpxx/e0QyPEaCptQzlACfnXZjNBMRR1SIJ2NeeI+Q
+  iCYRBWfoD9Hc073e4eXgdJ0CgYA40bEW5vl7yFwlDAgm2cZqFE+B3B/XafXHjB6+
+  fUFc/GqTUe7G9GUnLrw0RwDv0ILiVwNEhgZoiiNBJd7MSzBQ00OdjoTRTF5VQrYj
+  RqN0VXp73GmpIusKaRIG2ARJ7FPG+fwPJipOHBRqjRQwHISdJOsk1OE/adZBfLa/
+  888dLQKBgCXjjzw/ObIha/1MEYv8d6Y95BHGBaD8OS91cuHxah5YS7PXl4wuJpoW
+  tycSM9+/huVIaBbKYr6XHldBW26+Gd0HPlGcQli/2DwAFTT17cdstupbOXbiJ7dq
+  VQfuKHwOe6AWOsDkgcaXHbyebkjM6USc6Ne6fNYFCluL1CvVuOaT
+  -----END RSA PRIVATE KEY-----

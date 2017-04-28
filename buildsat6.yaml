@@ -1,0 +1,39 @@
+---
+- hosts: all
+  become: true
+  gather_facts: true
+  remote_user: ec2-user
+  vars_files:
+    - "group_vars/all/vars"
+    - "group_vars/all/vault"
+  vars:
+    satellite_deployment_hostname_short: "{{ ansible_hostname }}"
+    satellite_deployment_hostname_full: "{{ ansible_nodename }}"
+    satellite_deployment_admin_username: "admin"
+    satellite_deployment_admin_password: "{{ root_password }}"
+    satellite_deployment_organization: "redhat"
+    satellite_deployment_location: "nyc"
+    satellite_deployment_rhn_user: "{{ rhn_user }}"
+    satellite_deployment_rhn_password: "{{ rhn_pass }}"
+
+    satellite_deployment_answers:
+      "foreman-initial-organization": "{{ satellite_deployment_organization }}"
+      "foreman-initial-location": "{{ satellite_deployment_location }}"
+      "foreman-admin-username": "{{ satellite_deployment_admin_username }}"
+      "foreman-admin-password": "{{ satellite_deployment_admin_password }}"
+      "foreman-proxy-puppetca": "true"
+      "capsule-puppet": "true"
+
+    satellite_deployment_manifest_path: "{{ role_path }}/files/Cloud_Suite_Latest.zip"
+
+    satellite_deployment_repositories:
+      - { product_name: 'Red Hat Enterprise Linux Server', name_repo: 'Red Hat Enterprise Linux 7 Server (RPMs)', rel: '7Server', architecture: 'x86_64', state: enable}
+      - { product_name: 'Red Hat Enterprise Linux Server', name_repo: 'Red Hat Satellite Tools 6.2 (for RHEL 7 Server) (RPMs)', architecture: 'x86_64', state: enable}
+      - { product_name: 'Red Hat Software Collections for RHEL Server', name_repo: 'Red Hat Software Collections RPMs for Red Hat Enterprise Linux 7 Server', rel: '7Server', architecture: 'x86_64', state: enable}
+      - { product_name: 'Red Hat CloudForms', name_repo: 'Red Hat CloudForms Management Engine 5.7 (RPMs)', architecture: 'x86_64', state: enable}
+
+  roles:
+  - role: ntp
+    ntp_server:
+      - '0.pool.ntp.org'
+  - role: "satellite-deployment"

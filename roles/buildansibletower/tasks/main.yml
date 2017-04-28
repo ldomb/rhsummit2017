@@ -1,0 +1,207 @@
+---
+# tasks file for ldomb.buildansibletower
+- name: get tar for ansibletower
+  get_url:
+    url: http://releases.ansible.com/ansible-tower/setup-bundle/ansible-tower-setup-bundle-{{ tower_version }}.el7.tar.gz
+    dest: /tmp/ansible-tower-setup-bundle.tar.gz
+
+- name: untar /tmp/ansible-tower-setup-bundle.tar.gz
+  unarchive:
+    src: /tmp/ansible-tower-setup-bundle.tar.gz
+    dest: /tmp/
+    remote_src: true
+    owner: root
+
+- name: replace /tmp/ansible-tower-setup-bundle-{{ tower_version }}.el7/roles/nginx/tasks/tasks.yml
+  replace:
+    dest: /tmp/ansible-tower-setup-bundle-{{ tower_version }}.el7/roles/nginx/tasks/tasks.yml
+    regexp: 'www.ansible.com'
+    replace: "{{ ansible_nodename }}"
+
+- name: add /etc/tower path to setting.py
+  lineinfile:
+    dest: /tmp/ansible-tower-setup-bundle-{{ tower_version }}.el7/roles/awx_install/templates/settings.py.j2
+    line: "AWX_PROOT_SHOW_PATHS = ['/etc/tower/']"
+
+- name: copy inventory to setup folder
+  template:
+    src: templates/towerinventorysetup
+    dest: /tmp/ansible-tower-setup-bundle-{{ tower_version }}.el7/inventory
+
+- name: execute the tower installation
+  command: /tmp/ansible-tower-setup-bundle-{{ tower_version }}.el7/setup.sh
+  register: towerinstall
+
+- name: change perms on tower.cert
+  file:
+    path: /etc/tower/tower.cert
+    mode: 0444
+    group: root
+    owner: root
+
+- name: add license
+  uri:
+    url: https://{{inventory_hostname}}/api/v1/config/
+    method: POST
+    validate_certs: no
+    user: admin
+    password: "{{ tower_pass }}"
+    status_code: 200
+    body: "{{ tower_lic }}"
+    body_format: json
+
+- name: install pip needed for manageiq-client
+  yum:
+    name: python2-pip
+    state: latest
+
+- name: install manageiq-client
+  pip:
+    name: manageiq-client
+
+- name: install ansible-tower-cli
+  pip:
+    name: ansible-tower-cli
+
+- name: copy tower-cli config /etc/tower/tower_cli.cfg
+  template:
+    src: templates/tower_cli.cfg.j2
+    dest: /etc/tower/tower_cli.cfg
+    mode: 0600
+
+- name: fixing satellite6 kind /usr/lib/python2.7/site-packages/tower_cli/resources/credential.py
+  template:
+    src: templates/credential.py
+    dest: /usr/lib/python2.7/site-packages/tower_cli/resources/credential.py
+    mode: 0644
+    owner: root
+    group: root
+
+- name: create private key 
+  lineinfile:
+    dest: /tmp/private_key.pem
+    line: "{{ ec2_private_key }}"
+    create: yes
+
+- name: add aws creds
+  command: tower-cli credential create --kind aws --name=ldo-ec2 --organization=Default --username {{ ec2_access }} --password {{ ec2_secret }}
+
+- name: add ec2 creds
+  command: tower-cli credential create --kind ssh --username ec2-user --user admin --organization Default --name ec2-user --ssh-key-data /tmp/private_key.pem --vault-password={{ vault_password }}
+
+- name: remove file
+  file:
+    state: absent
+    path: /tmp/private_key.pem
+
+- name: add gitlab creds
+  command: tower-cli credential create --kind scm --name gitlab --username ldomb --password {{ gitlab_pass }} --organization Default
+
+- name: create inventory
+  command: tower-cli inventory create -n aws --organization=Default 
+  register: inventory
+  retries: 10
+  until: inventory.rc == 0
+  ignore_errors: yes
+  delay: 5
+
+- name: create group
+  command: tower-cli group create -n aws --credential ldo-ec2 -i aws --source ec2
+  register: group
+  retries: 10
+  until: group.rc == 0
+  ignore_errors: yes
+  delay: 5
+
+- name: create project summit2017
+  command: tower-cli project create -n summit2017 --scm-type git --scm-url {{ git_url }}
+  register: project
+  retries: 10
+  until: project.rc == 0
+  ignore_errors: yes
+  delay: 5
+
+- name: create job template cfme
+  command: tower-cli job_template create --name createcfmeshell --project=summit2017 --inventory=aws --machine-credential ec2-user --cloud-credential ldo-ec2 --playbook buildshell.yaml --verbosity more_verbose --extra-vars "ec2_tag_Name={{ cfme_tag_Name}} ec2_tag_Type={{ cfme_tag_Type }} ec2_image=ami-d3c269c5 ec2_instance_type=m3.large ec2_volume_size=41" 
+  register: cfmeshell
+  retries: 10
+  until: cfmeshell.rc == 0
+  ignore_errors: yes
+  delay: 5
+
+- name: create job template sat6
+  command: tower-cli job_template create --name createsat6shell --project=summit2017 --inventory=aws --machine-credential ec2-user --cloud-credential ldo-ec2 --playbook buildshell.yaml --verbosity more_verbose --extra-vars "ec2_tag_Name={{ sat6_tag_Name }} ec2_tag_Type={{ sat6_tag_Type }} ec2_instance_type=m3.xlarge ec2_volume_size=64" 
+  register: sat6shell
+  retries: 10
+  until: sat6shell.rc == 0
+  ignore_errors: yes
+  delay: 5
+
+- name: create job template cfme
+  command: tower-cli job_template create --name createcfme --project=summit2017 --inventory=aws --machine-credential ec2-user --cloud-credential ldo-ec2 --playbook buildcfme.yaml --verbosity more_verbose --limit tag_Type_{{ cfme_tag_Type }}
+  register: cfme
+  retries: 10
+  until: cfme.rc == 0
+  ignore_errors: yes
+  delay: 5
+
+- name: create job template sat6
+  command: tower-cli job_template create --name createsat6 --project=summit2017 --inventory=aws --machine-credential ec2-user --cloud-credential ldo-ec2 --playbook buildsat6.yaml --verbosity more_verbose --limit tag_Type_{{ sat6_tag_Type }}
+  register: sat6
+  delay: 5
+
+- name: launch job template cfmeshell
+  command: tower-cli job launch --job-template=createcfmeshell
+  register: cfmejob
+  retries: 10
+  until: cfmejob.rc == 0
+  ignore_errors: yes
+  delay: 5
+
+
+- name: pause for 45 seconds so that machines are built
+  pause:
+    seconds: 45
+
+
+- name: launch job template sat6shell
+  command: tower-cli job launch --job-template=createsat6shell
+  register: sat6job
+  retries: 10
+  until: sat6job.rc == 0
+  ignore_errors: yes
+  delay: 5
+
+
+- name: pause for 45 seconds so that machines are built
+  pause:
+    seconds: 45
+
+- name: update inventory
+  shell: tower-cli group sync aws
+  register: sync
+  retries: 10
+  until: sync.rc == 0
+  ignore_errors: yes
+  delay: 5
+
+- name: pause for 45 seconds so that machines are built
+  pause:
+    seconds: 45
+
+- name: launch job template cfme
+  command: tower-cli job launch --job-template=createcfme
+  register: cfmeinst
+  retries: 10
+  until: cfmeinst.rc == 0
+  ignore_errors: yes
+  delay: 5
+
+- name: launch job template sat6
+  command: tower-cli job launch --job-template=createsat6
+  register: sat6inst
+  retries: 10
+  until: sat6inst.rc == 0
+  ignore_errors: yes
+  delay: 5
+

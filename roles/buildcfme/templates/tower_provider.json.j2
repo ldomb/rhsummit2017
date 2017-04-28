@@ -1,0 +1,9 @@
+{
+  "type":"ManageIQ::Providers::AnsibleTower::Provider",
+  "name":"Ansible Tower",
+  "url":"https://{{ hostvars[groups['tag_Name_' + tower_tag_Name][0]]['ec2_private_dns_name'] }}",
+  "credentials" : {
+    "userid"    : "admin",
+    "password"  : "{{ tower_pass }}"
+  }
+}

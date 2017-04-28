@@ -1,0 +1,6 @@
+---
+# handlers file for juliovp01.ansible_satellite6
+- name: restart apache
+  service:
+    name: httpd
+    state: restarted

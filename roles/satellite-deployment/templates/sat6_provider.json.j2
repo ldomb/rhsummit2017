@@ -1,0 +1,9 @@
+{
+  "type":"ManageIQ::Providers::Foreman::Provider",
+  "name":"Satellite 6",
+  "url":"https://{{ hostvars[groups['tag_Name_' + sat6_tag_Name][0]]['ec2_private_dns_name'] }}",
+  "credentials" : {
+    "userid"    : "admin",
+    "password"  : "{{ sat6_pass }}"
+  }
+}

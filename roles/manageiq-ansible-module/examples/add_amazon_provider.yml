@@ -1,0 +1,19 @@
+---
+- hosts: localhost
+
+  tasks:
+  - name: Add Amazon EC2 Provider to ManageIQ
+    manageiq_provider:
+      name: 'AWS01'
+      provider_type: 'amazon'
+      state: 'present'
+      provider_region: 'us-west-2'
+      access_key_id: '******'
+      secret_access_key: '******'
+      miq_url: 'http://miq.example.com'
+      miq_username: 'admin'
+      miq_password: '******'
+      miq_verify_ssl: false
+    register: result
+
+  - debug: var=result

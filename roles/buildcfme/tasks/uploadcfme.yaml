@@ -1,0 +1,38 @@
+---
+#ansible-playbook provision-ec2-aio.yaml --private-key=/home/dobby/.ssh/ldomb.pem -vv
+- hosts: localhost
+  connection: local
+  gather_facts: false
+  user: root
+
+  tasks:
+    - name: create an s3 bucket
+      s3_bucket:
+      name: cfmeeast
+
+    - name: upload cloudforms
+      s3:
+      bucket: cfmeeast
+      object: cfme-ec2-5.7.1.3-1.x86_64.vhd
+        src: files/cfme-ec2-5.7.1.3-1.x86_64.vhd
+        mode: put
+
+    - name: 
+      iam:
+        iam_type: role
+        name: trust-policy.json
+        trust_policy_filepath: files/trust-policy.json
+        state: present
+
+    - name: 
+      iam_policy:
+        iam_type: role
+        iam_name: vmimport
+        policy_name: vmimport
+        policy_document: files/role-policy.json"
+        state: present
+
+    - name: import-image using cli because cant find ec2 import
+      shell: aws ec2 import-image --description "cfme57131" --disk-containers file://containers.json
+      args:
+        chdir: files

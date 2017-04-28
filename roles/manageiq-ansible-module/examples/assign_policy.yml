@@ -1,0 +1,18 @@
+---
+- hosts: hosts
+
+  tasks:
+  - name: Assign policy on an OpenShift provider in ManageIQ
+    manageiq_policy_assignment:
+      entity: 'policy'
+      entity_name: 'example policy'
+      resource: 'provider'
+      resource_name: 'OpenShift01'
+      state: 'present'
+      miq_url: 'http://miq.example.com'
+      miq_username: 'admin'
+      miq_password: '******'
+      miq_verify_ssl: false
+    register: result
+
+  - debug: var=result

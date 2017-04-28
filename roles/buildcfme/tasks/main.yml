@@ -1,0 +1,154 @@
+---
+# tasks file for ldomb.buildcfme
+- name: copy chrony configuration for RHEL7
+  template:
+    src: chrony.j2
+    dest: /etc/chrony.conf
+    owner: root
+    group: root
+    mode: 0644
+  register: chrony_conf
+
+- name: ensure chrony service is started and enabled
+  service:
+    name: chronyd
+    state: started
+    enabled: yes
+
+- name: ensure chrony is getting restarted if necessary
+  service:
+    name: chronyd
+    state: restarted
+  when: chrony_conf|changed
+
+- name: perform appliance basic configuration
+  shell: source /root/.bashrc && appliance_console_cli --host={{ inventory_hostname }} --region=99 --internal --password={{ cfme_pass }} --key --force-key --dbdisk=/dev/xvdb --sshpassword={{ root_password }} creates=/var/www/miq/vmdb/log/appliance_console.log
+
+- name: wait for cfme ui
+  wait_for: host={{ inventory_hostname }} port=443 timeout=600
+
+- name: set internal admin password
+  shell: source /root/.bashrc && rails r "User.find_by_userid('admin').update_attributes(:password => '{{ cfme_pass }}')"
+  args:
+    chdir: /var/www/miq/vmdb
+
+- name: copy settings.sql (thank you wolfram richter)
+  copy: 
+    src: settings.sql
+    dest: /tmp/settings.sql 
+    owner: root
+    group: root
+    mode: 0644
+
+- name: apply settings.sql
+  shell: sudo -i -u postgres psql -f /tmp/settings.sql vmdb_production
+
+- name: restart evmserverd
+  service: 
+    name: evmserverd
+    state: restarted
+
+- name: make sure evmserverd is running
+  service: 
+    name: evmserverd 
+    state: started
+    enabled: yes
+
+- name: wait for cfme ui
+  wait_for: host={{ inventory_hostname }} port=443 timeout=600
+
+- name: pause because race
+  pause:
+    minutes: 2
+
+- name: add tower to /etc/hosts on cfme
+  lineinfile:
+    dest: /etc/hosts
+    line: "{{ hostvars[groups['tag_Name_' + tower_tag_Name][0]]['ec2_private_ip_address'] }} {{ hostvars[groups['tag_Name_' + tower_tag_Name][0]]['ec2_private_dns_name'] }} tower"
+
+- name: get cert
+  command: cat /etc/tower/tower.cert
+  register: towercert
+  delegate_to: "localhost"
+  become: false
+
+- name: towercrt
+  lineinfile:
+    dest: /etc/pki/ca-trust/source/anchors/tower.crt
+    line: "{{ towercert.stdout }}"
+    create: yes
+
+- name: update certs
+  shell: update-ca-trust
+
+- name: create tower provider
+  uri:
+    url: "https://{{ inventory_hostname }}/api/providers?provider_class=provider"
+    method: "POST"
+    user: "admin"
+    password: "{{ cfme_pass }}"
+    validate_certs: no
+    body_format: json
+    body: "{{ lookup('template', 'tower_provider.json.j2') | to_json }}"
+
+- name: Add Amazon EC2 Provider to ManageIQ
+  manageiq_provider:
+    name: 'AWS01'
+    provider_type: 'amazon'
+    state: 'present'
+    provider_region: 'us-east-1'
+    access_key_id: "{{ ec2_access }}"
+    secret_access_key: "{{ ec2_secret }}"
+    miq_url: 'https://{{ inventory_hostname }}'
+    miq_username: 'admin'
+    miq_password: "{{ cfme_pass }}"
+    miq_verify_ssl: false
+  become: false
+  delegate_to: localhost
+  register: result
+
+- debug: var=result
+
+- name: get ansible tower pub ip
+  set_fact:
+    towerpubip: "{{ hostvars[groups['tag_Name_' + tower_tag_Name ][0]]['ec2_ip_address'] }}"
+
+- name: create cfme creds
+  command: tower-cli credential create -n cloudforms --kind cloudforms --username admin  --password {{ cfme_pass }} --host https://{{ inventory_hostname }} --organization Default
+  register: cfmecreds
+  retries: 10
+  until: cfmecreds.rc == 0
+  ignore_errors: yes
+  delay: 5
+  delegate_to: "{{ towerpubip }}"
+
+- name: create cfme inventory
+  command: tower-cli inventory create -n cloudforms --organization=Default
+  register: cfmeinvent
+  retries: 10
+  until: cfmeinvent.rc == 0
+  ignore_errors: yes
+  delay: 5
+  delegate_to: "{{ towerpubip }}"
+
+- name: create cfme group
+  command: tower-cli group create -n cloudforms --credential cloudforms -i cloudforms --source cloudforms
+  register: cfmegroup
+  retries: 10
+  until: cfmegroup.rc == 0
+  ignore_errors: yes
+  delay: 5
+  delegate_to: "{{ towerpubip }}"
+
+- name: wait for cloudforms to do a provider refresh
+  pause:
+    minutes: 1
+
+- name: cfme inventory sync
+  command: tower-cli group sync cloudforms
+  register: cfmesync
+  retries: 10
+  until: cfmesync.rc == 0
+  ignore_errors: yes
+  delay: 5
+  delegate_to: "{{ towerpubip }}"
