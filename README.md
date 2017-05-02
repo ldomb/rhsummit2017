@@ -19,6 +19,8 @@ How is this executed
 
 $ ansible-playbook buildrhmgmt.yaml --private-key=ldomb.pem --vault-password-file=../vaultpass -vv
 
+A video of the full run can be found here: 
+http://bit.ly/2oQwxxF
 
 Dependencies
 ------------
